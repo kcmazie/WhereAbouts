@@ -50,7 +50,10 @@
                    :                    Added more debug messages.  Removed some items hardcoded in previous 
                    :                    releases.  Added detection of run from editor to force debug mode.  Added detection
                    :                    of Html verses text based email sigantures.
+                   : v7.10 - 05-16-25 - Corrected bug in siganture injection (HTML option missing in email function).  Fixed
+                   :                    bug with infobox green color not applying during run.  Added neuter option for 
+                   :                    quick testing.
                    : #>
-                   $ScriptVer = "7.00"    <#--[ Current version # used in script ]--
+                   $ScriptVer = "7.10"    <#--[ Current version # used in script ]--
                    : 
 ------------------------------------------------------------------------------#>
