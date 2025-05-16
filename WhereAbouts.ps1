@@ -50,8 +50,11 @@
                    :                    Added more debug messages.  Removed some items hardcoded in previous 
                    :                    releases.  Added detection of run from editor to force debug mode.  Added detection
                    :                    of Html verses text based email sigantures.
+                   : v7.10 - 05-16-25 - Corrected bug in siganture injection (HTML option missing in email function).  Fixed
+                   :                    bug with infobox green color not applying during run.  Added neuter option for 
+                   :                    quick testing.
                    : #>
-                   $ScriptVer = "7.00"    <#--[ Current version # used in script ]--
+                   $ScriptVer = "7.10"    <#--[ Current version # used in script ]--
                    : 
 ------------------------------------------------------------------------------#>
 #Requires -Version 5.1
@@ -59,6 +62,7 @@ Clear-Host
 
 #--[ For Testing ]-------------
 #$Debug = $true
+$Neutered = $False  #--[ If enabled this will stop logging, stop email, and stop PC lock, for testing ]--
 #------------------------------
 
 #--[ Suppress Console ]-------------------------------------------------------
@@ -127,6 +131,7 @@ Function LoadConfig ($ExtOption,$ConfigFile,$Debug){  #--[ Read and load configu
         $ExtOption | Add-Member -Force -MemberType NoteProperty -Name "SSL" -Value $Config.Settings.Email.SSL
         $ExtOption | Add-Member -Force -MemberType NoteProperty -Name "EmailUser" -Value $Config.Settings.Email.EmailUser
         $ExtOption | Add-Member -Force -MemberType NoteProperty -Name "EmailPass" -Value $Config.Settings.Email.EmailPass
+        $ExtOption | Add-Member -Force -MemberType NoteProperty -Name "EmailHTML" -Value $Config.Settings.Email.HTML
         $ExtOption | Add-Member -Force -MemberType NoteProperty -Name "EmailSubject" -Value $Config.Settings.Email.EmailSubject
         $ExtOption | Add-Member -Force -MemberType NoteProperty -Name "PresetGroupEmail" -Value $Config.Settings.Email.PresetGroupEmail
         $ExtOption | Add-Member -Force -MemberType NoteProperty -Name "PresetGroupText" -Value $Config.Settings.Email.PresetGroupText
@@ -194,7 +199,7 @@ Function SendEmail ($ExtOption){    #--[ Constructs the email ]--
     }
     $Email = New-Object System.Net.Mail.MailMessage  
     $Email.Subject = $ExtOption.EmailSubject
-    If ($ExtOption.Email.HTML -like "*true*"){
+    If ($ExtOption.EmailHTML -like "*true*"){
         $Email.IsBodyHTML = $true
     }Else{
         $Email.IsBodyHTML = $false
@@ -238,7 +243,7 @@ Function KillForm {
     $Form.Dispose()
     $Stop = $True
 }
-Function UpdateOutput {  #--[ Refreshes the infobox contents ]--
+Function UpdateOutput ($InfoBox) {  #--[ Refreshes the infobox contents ]--
     $InfoBox.update()
     $InfoBox.Select($InfoBox.Text.Length, 0)
     $InfoBox.ScrollToCaret()
@@ -290,8 +295,6 @@ Function StatusMsg ($Msg, $Color, $ExtOption){
 Function PopupMessage ($MessageBody,$MessageTitle,$DebugMsg){
     $ButtonType = [System.Windows.MessageBoxButton]::Ok
     $MessageIcon = [System.Windows.MessageBoxImage]::Warning
-    #$MessageBody = "You must enter a valid email address or this script will crash.  The script will now recycle...?"
-    #$MessageTitle = "Invalid Email Address !!!"
     StatusMsg $DebugMsg "red" $ExtOption
     [System.Windows.MessageBox]::Show($MessageBody,$MessageTitle,$ButtonType,$MessageIcon)
     ReloadForm $ExtOption
@@ -315,9 +318,11 @@ Function ActivateForm ($ExtOption){
     $Form.Add_KeyDown({if ($_.KeyCode -eq "Escape"){$Form.Close();$Stop = $true}})
     
     $LabelFont = new-object System.Drawing.Font("Microsoft Sans Serif Regular",10,[System.Drawing.FontStyle]::Bold)
-    $ButtonFont = new-object System.Drawing.Font("Microsoft Sans Serif Regular",10,[System.Drawing.FontStyle]::Regular)
-    $TextBoxFont = new-object System.Drawing.Font("Microsoft Sans Serif Regular",9,[System.Drawing.FontStyle]::Regular)
+    $ButtonFont = new-object System.Drawing.Font("Microsoft Sans Serif Regular",8,[System.Drawing.FontStyle]::Regular)
+    $TextBoxFont = new-object System.Drawing.Font("Microsoft Sans Serif Regular",10,[System.Drawing.FontStyle]::Regular)
     $CheckBoxFont = new-object System.Drawing.Font("Microsoft Sans Serif Regular",9,[System.Drawing.FontStyle]::Regular)
+    #$Font = new-object System.Drawing.Font("Calibri",9,[System.Drawing.FontStyle]::Bold)
+    #$Font = new-object System.Drawing.Font("Times New Roman",9,[System.Drawing.FontStyle]::Bold)
  
     #--[ Form Title Label ]-----------------------------------------------------------------
     $BoxLength = 350
@@ -596,17 +601,17 @@ Function ActivateForm ($ExtOption){
             }
             If ($TravelCheckBox.Checked){
                 $InfoBox.enabled = $true
-                $Font = new-object System.Drawing.Font("Calibri",9,[System.Drawing.FontStyle]::Bold)
-                #$Font = new-object System.Drawing.Font("Times New Roman",9,[System.Drawing.FontStyle]::Bold)
-                $InfoBox.Font = $font
+                $InfoBox.Font = $TexboxFont
                 $InfoBox.ForeColor = "yellow"
                 $InfoBox.BackColor = "green"            
                 $InfoBox.Text = "--- Logging Mileage ---"
-                UpdateOutput  #--[ Refresh the infobox ]--
+                UpdateOutput $InfoBox #--[ Refresh the infobox ]--
                 Start-Sleep -sec 2
                 $InfoBox.Text = "-----------------------"
-                UpdateOutput  #--[ Refresh the infobox ]--
-                LogTravel $ExtOption $Rundata
+                UpdateOutput $InfoBox #--[ Refresh the infobox ]--
+                If (!($Neutered)){
+                    LogTravel $ExtOption $Rundata
+                }
             }   
             If ($ExtOption.EmailSig -eq "False"){
                 StatusMsg "Text email signature detected..." "Magenta" $ExtOption
@@ -627,23 +632,29 @@ Function ActivateForm ($ExtOption){
             $ExtOption | Add-Member -MemberType NoteProperty -Name "EmailMessage" -Value $NewSig -force
 
             Start-Sleep -sec 2
+            $InfoBox.enabled = $true
+            $InfoBox.Font = $TextBoxFont
+            $InfoBox.ForeColor = "yellow"
+            $InfoBox.BackColor = "green" 
             $InfoBox.Text = "--- Sending Email ---"
-            UpdateOutput  #--[ Refresh the infobox ]--
+            UpdateOutput $InfoBox #--[ Refresh the infobox ]--
             Start-Sleep -sec 2
-            SendEmail $ExtOption
+            If (!($Neutered)){
+                SendEmail $ExtOption
+            }
             $InfoBox.Text = "-----------------------"
-            UpdateOutput  #--[ Refresh the infobox ]--
+            UpdateOutput $InfoBox #--[ Refresh the infobox ]--
             Start-Sleep -sec 2
             If ($LockCheckBox.Checked){
                 $InfoBox.Text = "--- Locking PC ---"
-                UpdateOutput  #--[ Refresh the infobox ]--
+                UpdateOutput $InfoBox  #--[ Refresh the infobox ]--
                 Start-Sleep -sec 2
-                #If (!($Script:Debug)){
- #                   LockPC $ExtOption
-                #}
-            }
+                If (!($Neutered)){
+                   LockPC $ExtOption
+                }
+             }
         }
-        $Form.Close()
+        $Form.Close()        
     })
     $Form.Controls.Add($ProcessButton)
 
@@ -736,13 +747,13 @@ StatusMsg ('Site Count  = '+$ExtOption.SiteList.Count) "Magenta" $ExtOption
 StatusMsg ('Box Count   = '+($ExtOption.SiteList.Count/2)) "Magenta"  $ExtOption
 
 #--[ Execute the form ]------------------------------------------------
-If ($ExtOption.Console){
-    $ExtOption
-}
-
-#$ExtOption    #--[ Uncomment to display the option object's contents ]--
+#$ExtOption    #--[ Uncomment to display the option object's contents before processing ]--
 
 ActivateForm $ExtOption
+
+If ($Neutered){
+    $ExtOption    
+}
 
 <#--[ Manual Shortcut Details ]---------------------------------------- 
 To prevent any pop-up commend windows use the following in the "Target" field of a shortcut 
@@ -789,20 +800,5 @@ C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -file "c:\scripts\Wher
 		<site>Other (see below),0</site>
     </Sites>
 </Settings> 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #>
